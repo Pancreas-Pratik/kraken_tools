@@ -5,6 +5,7 @@ import argparse
 import time
 import logging
 import traceback
+import shap
 
 from kraken_tools.logger import setup_logger, log_print
 from kraken_tools.utils.sample_utils import validate_sample_key, check_input_files_exist

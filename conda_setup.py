@@ -152,7 +152,8 @@ def install_dependencies(env_name, bioconda_channel):
         "scikit-learn",
         "statsmodels",
         "tqdm",
-        "psutil"
+        "psutil",
+        "shap"
     ]
     
     # Bioconda tools
