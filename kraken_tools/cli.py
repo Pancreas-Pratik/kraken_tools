@@ -664,6 +664,11 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
             # Run preprocessing
             log_print("Starting preprocessing (KneadData) step...", level="info")
             
+            if not args.kraken_db:
+                raise ValueError("--kraken-db is required for full-pipeline")
+            if not args.bracken_db:
+                raise ValueError("--bracken-db is required for full-pipeline")
+                
             if args.use_parallel:
                 preprocessing_results = run_preprocessing_pipeline_parallel(
                     input_files=args.input_fastq,
@@ -671,6 +676,8 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                     threads_per_sample=args.threads_per_sample,
                     max_parallel=args.max_parallel,
                     kneaddata_dbs=args.kneaddata_dbs,
+                    kraken_db=args.kraken_db,
+                    bracken_db=args.bracken_db,
                     paired=args.paired,
                     logger=logger
                 )
@@ -680,6 +687,8 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                     output_dir=preproc_dir,
                     threads=args.threads,
                     kneaddata_dbs=args.kneaddata_dbs,
+                    kraken_db=args.kraken_db,
+                    bracken_db=args.bracken_db,
                     paired=args.paired,
                     logger=logger
                 )
