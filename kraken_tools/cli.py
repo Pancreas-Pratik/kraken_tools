@@ -767,7 +767,7 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                 log_print(f"Kraken2 completed with {len(kreport_files)} reports", level="info")
             
             # Run Bracken
-            if not args.skip_bracken and (not hasattr(args, 'output_type') or args.output_type != "kraken"):
+            if not getattr(args, "skip_bracken", False) and (not hasattr(args, 'output_type') or args.output_type != "kraken"):
                 log_print("Starting Bracken abundance estimation...", level="info")
                 
                 from kraken_tools.preprocessing.bracken_run import run_bracken, run_bracken_parallel
