@@ -131,6 +131,28 @@ def create_environment(env_name, python_version, force=False):
     
     return True
 
+def install_kreport2mpa(env_name):
+    """Install kreport2mpa.py from Jennifer Lu's KrakenTools repo."""
+    conda_path = check_conda()
+    script_url = "https://github.com/jenniferlu717/KrakenTools/raw/refs/heads/master/kreport2mpa.py"
+
+    result = subprocess.run(
+        [conda_path, "run", "--name", env_name, "python", "-c", "import sys; print(sys.prefix)"],
+        capture_output=True, text=True, check=True
+    )
+
+    bin_dir = Path(result.stdout.strip()) / ("Scripts" if platform.system() == "Windows" else "bin")
+    script_path = bin_dir / "kreport2mpa.py"
+
+    print("Installing kreport2mpa.py from Jennifer Lu KrakenTools...")
+    print("Citation: Lu J et al. Metagenome analysis using the Kraken software suite. Nature Protocols. 2022. doi: 10.1038/s41596-022-00738-y")
+    print("Source: https://github.com/jenniferlu717/KrakenTools/")
+
+    import urllib.request
+    urllib.request.urlretrieve(script_url, script_path)
+
+    if platform.system() != "Windows":
+        os.chmod(script_path, 0o755)
 
 def install_dependencies(env_name, bioconda_channel):
     """Install all dependencies in the conda environment."""
@@ -195,6 +217,9 @@ def install_dependencies(env_name, bioconda_channel):
             except subprocess.CalledProcessError:
                 print(f"  Could not install {dep}. Please install it manually after setup.")
     
+    # Install external KrakenTools script used by bracken_run.py
+    install_kreport2mpa(env_name)
+
     # Install pip dependencies
     print("Installing additional dependencies with pip...")
     pip_cmd = [
