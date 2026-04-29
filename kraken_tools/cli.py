@@ -734,7 +734,7 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
             os.makedirs(bracken_dir, exist_ok=True)
             
             # Run Kraken2
-            if not args.skip_kraken and (not hasattr(args, 'output_type') or args.output_type != "bracken"):
+            if not getattr(args, "skip_kraken", False) and (not hasattr(args, 'output_type') or args.output_type != "bracken"):
                 log_print("Starting Kraken2 classification...", level="info")
                 
                 from kraken_tools.preprocessing.kraken_run import run_kraken, run_kraken_parallel
