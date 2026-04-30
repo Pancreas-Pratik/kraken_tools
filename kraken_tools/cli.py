@@ -803,15 +803,15 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
         # Process files step
         abundance_file = None
         
-        if not args.skip_kraken and not kreport_dir:
+        if not getattr(args, "skip_kraken", False) and not kreport_dir:
             kreport_dir = os.path.join(taxonomy_dir, "kraken_reports")
             
-        if not args.skip_bracken and not bracken_dir:
+        if not getattr(args, "skip_bracken", False) and not bracken_dir:
             bracken_dir = os.path.join(taxonomy_dir, "bracken_output")
         
         # Adjust skip flags based on output_type
-        skip_kraken = args.skip_kraken or (hasattr(args, 'output_type') and args.output_type == "bracken")
-        skip_bracken = args.skip_bracken or (hasattr(args, 'output_type') and args.output_type == "kraken")
+        skip_kraken = getattr(args, "skip_kraken", False) or (hasattr(args, 'output_type') and args.output_type == "bracken")
+        skip_bracken = getattr(args, "skip_bracken", False) or (hasattr(args, 'output_type') and args.output_type == "kraken")
         
         log_print("Processing taxonomic files...", level="info")
         abundance_file, success = run_full_pipeline(
