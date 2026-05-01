@@ -804,10 +804,10 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
         abundance_file = None
         
         if not getattr(args, "skip_kraken", False) and not kreport_dir:
-            kreport_dir = os.path.join(taxonomy_dir, "kraken_reports")
-            
+            kreport_dir = os.path.join(preproc_dir, "kraken_output")
+        
         if not getattr(args, "skip_bracken", False) and not bracken_dir:
-            bracken_dir = os.path.join(taxonomy_dir, "bracken_output")
+            bracken_dir = os.path.join(preproc_dir, "bracken_output")
         
         # Adjust skip flags based on output_type
         skip_kraken = getattr(args, "skip_kraken", False) or (hasattr(args, 'output_type') and args.output_type == "bracken")
