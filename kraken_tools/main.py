@@ -6,6 +6,7 @@ This module provides functions to run the full analysis pipeline
 or individual components as needed.
 """
 import os
+import glob
 import logging
 import time
 import traceback
@@ -84,18 +85,35 @@ def run_full_pipeline(
         # Look for existing Bracken files
         bracken_files = {}
         for sample in samples:
-            # Look for Bracken abundance file patterns
-            potential_files = [
+            # Look for Bracken abundance file patterns.
+            # Exact names:
+            #   sample34154_s_abundance.txt
+            # KneadData-derived names:
+            #   sample34154_R1_kneaddata_paired_1_s_abundance.txt
+            #   sample34154_R1_kneaddata_paired_2_s_abundance.txt
+            potential_patterns = [
                 os.path.join(bracken_dir, f"{sample}_{taxonomic_level.lower()}_abundance.txt"),
+                os.path.join(bracken_dir, f"{sample}*_{taxonomic_level.lower()}_abundance.txt"),
                 os.path.join(bracken_dir, f"{sample}.{taxonomic_level.lower()}.bracken"),
+                os.path.join(bracken_dir, f"{sample}*.{taxonomic_level.lower()}.bracken"),
                 os.path.join(bracken_dir, f"{sample}_{taxonomic_level.lower()}.bracken"),
-                os.path.join(bracken_dir, f"{sample}_bracken_{taxonomic_level.lower()}_abundance.txt")
+                os.path.join(bracken_dir, f"{sample}*_{taxonomic_level.lower()}.bracken"),
+                os.path.join(bracken_dir, f"{sample}_bracken_{taxonomic_level.lower()}_abundance.txt"),
+                os.path.join(bracken_dir, f"{sample}*_bracken_{taxonomic_level.lower()}_abundance.txt"),
             ]
-            
-            for file_path in potential_files:
-                if os.path.isfile(file_path):
-                    bracken_files[sample] = file_path
-                    break
+
+            matched_files = []
+            for pattern in potential_patterns:
+                matched_files.extend(glob.glob(pattern))
+
+            matched_files = sorted(set(matched_files))
+            if matched_files:
+                bracken_files[sample] = matched_files[0]
+                if len(matched_files) > 1:
+                    log_print(
+                        f"Found multiple Bracken files for sample {sample}; using first: {matched_files[0]}",
+                        level="warning"
+                    )
         
         if bracken_files:
             log_print(f"Found {len(bracken_files)} Bracken abundance files at {taxonomic_level} level", level="info")
