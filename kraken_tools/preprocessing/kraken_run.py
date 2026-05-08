@@ -188,23 +188,35 @@ def run_kraken_parallel(input_files, output_dir, threads=1, max_parallel=None,
         sample_list = []
         
         if paired:
-            # Ensure we have pairs of files
-            if len(input_files) % 2 != 0:
-                logger.error("Paired mode requires an even number of input files")
-                return {}
-            
-            # Pair files in order (assuming they're in order: R1, R2, R1, R2, etc.)
-            for i in range(0, len(input_files), 2):
-                r1_file = input_files[i]
-                r2_file = input_files[i+1]
-                
-                # Get sample name from the R1 file
-                sample_name = extract_sample_name(r1_file)
+            # Pair files by exact KneadData paired basename, not by list order.
+            pairs = {}
+
+            for f in input_files:
+                base = os.path.basename(f)
+                m = re.match(r"^(?P<sample>.+)_kneaddata_paired_(?P<read>[12])\.fastq$", base)
+                if not m:
+                    logger.debug(f"Skipping non-final paired KneadData file for Kraken2 pairing: {f}")
+                    continue
+
+                sample = m.group("sample")
+                read = m.group("read")
+                pairs.setdefault(sample, {})[read] = f
+
+            for sample in sorted(pairs):
+                if "1" not in pairs[sample] or "2" not in pairs[sample]:
+                    logger.error(f"Missing R1/R2 KneadData pair for sample {sample}: {pairs[sample]}")
+                    return {}
+
+                sample_name = f"{sample}_kneaddata_paired"
+                r1_file = pairs[sample]["1"]
+                r2_file = pairs[sample]["2"]
+
+                logger.info(f"Pairing Kraken2 files for sample {sample_name}: {os.path.basename(r1_file)} + {os.path.basename(r2_file)}")
                 sample_list.append((sample_name, r1_file, r2_file))
         else:
             # Single-end reads
             for file in input_files:
-                sample_name = os.path.basename(file).split('.')[0]
+                sample_name = extract_sample_name(file)
                 sample_list.append((sample_name, file))
         
         # Prepare common arguments for all samples
@@ -327,19 +339,29 @@ def run_kraken(input_files, output_dir, threads=1, kraken_db=None,
     
     # Process files based on whether they're paired
     if paired:
-        # Ensure we have pairs of files
-        if len(input_files) % 2 != 0:
-            logger.error("Paired mode requires an even number of input files")
-            return {}
-        
-        # Process pairs
-        for i in range(0, len(input_files), 2):
-            r1_file = input_files[i]
-            r2_file = input_files[i+1]
-            
-            # Get sample name from the file
-            sample_name = extract_sample_name(r1_file)
-            logger.info(f"Processing paired files for sample {sample_name}")
+        pairs = {}
+
+        for f in input_files:
+            base = os.path.basename(f)
+            m = re.match(r"^(?P<sample>.+)_kneaddata_paired_(?P<read>[12])\.fastq$", base)
+            if not m:
+                logger.debug(f"Skipping non-final paired KneadData file for Kraken2 pairing: {f}")
+                continue
+
+            sample = m.group("sample")
+            read = m.group("read")
+            pairs.setdefault(sample, {})[read] = f
+
+        for sample in sorted(pairs):
+            if "1" not in pairs[sample] or "2" not in pairs[sample]:
+                logger.error(f"Missing R1/R2 KneadData pair for sample {sample}: {pairs[sample]}")
+                return {}
+
+            sample_name = f"{sample}_kneaddata_paired"
+            r1_file = pairs[sample]["1"]
+            r2_file = pairs[sample]["2"]
+
+            logger.info(f"Processing paired files for sample {sample_name}: {os.path.basename(r1_file)} + {os.path.basename(r2_file)}")
             
             sample_output_dir = os.path.join(output_dir, sample_name)
             os.makedirs(sample_output_dir, exist_ok=True)
@@ -380,7 +402,10 @@ def run_kraken(input_files, output_dir, threads=1, kraken_db=None,
                 results[sample_name] = result
     
     # Check for overall success rate
-    total_samples = len(input_files) // 2 if paired else len(input_files)
+    if paired:
+        total_samples = len(results)
+    else:
+        total_samples = len(input_files)
     successful_samples = len(results)
     success_rate = (successful_samples / total_samples) * 100 if total_samples > 0 else 0
     

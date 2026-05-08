@@ -58,11 +58,11 @@ def process_single_sample_bracken(kreport_file, sample_id=None, output_dir=None,
     # Add taxonomic level
     cmd.extend(["-l", taxonomic_level])
     
-    # Add threshold
-    cmd.extend(["-t", str(threshold)])
-    
-    # Add threads
-    cmd.extend(["-t", str(threads)])
+    # Add threshold; Bracken est_abundance.py expects an integer string.
+    cmd.extend(["-t", str(int(float(threshold)))])
+
+    # Bracken est_abundance.py does not use a Kraken-style threads option here.
+    # Do not add threads with -t; -t is already the abundance threshold.
     
     # Add output file
     output_file = os.path.join(output_dir, f"{sample_id}_{taxonomic_level.lower()}_abundance.txt")

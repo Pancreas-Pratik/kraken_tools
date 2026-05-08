@@ -36,7 +36,13 @@ def process_single_sample_kneaddata(input_file, sample_id=None, output_dir=None,
     # Build command 
     if paired_file:
         # For paired-end reads, use -i1 and -i2 (don't include --paired flag)
-        cmd = ["kneaddata", "-i1", input_file, "-i2", paired_file, "--output", output_dir]
+        cmd = [
+                    "kneaddata",
+                    "-i1", input_file,
+                    "-i2", paired_file,
+                    "--output", output_dir,
+                    "--output-prefix", f"{sample_id}_kneaddata"
+                ]
         logger.debug(f"Running KneadData in paired mode with files: {os.path.basename(input_file)} and {os.path.basename(paired_file)}")
     else:
         # For single-end reads, use --input
@@ -58,8 +64,8 @@ def process_single_sample_kneaddata(input_file, sample_id=None, output_dir=None,
     # Add additional options
     if additional_options:
         for key, value in additional_options.items():
-            if key == 'paired':
-                # Skip the paired flag as it's handled by using -i1 and -i2
+            if key in {"paired", "output_prefix", "output-prefix"}:
+                # paired is handled by -i1/-i2; output-prefix is set explicitly above
                 continue
             
             if value is True:
@@ -77,12 +83,25 @@ def process_single_sample_kneaddata(input_file, sample_id=None, output_dir=None,
         logger.error(f"KneadData run failed for sample {sample_id}")
         return None
     
-    # Find output files
+    # Find only this sample's final paired KneadData outputs.
+    # Important: all parallel samples write into the same output_dir, so do NOT
+    # return every "*kneaddata_paired*" file in the directory.
     output_files = []
-    for file in os.listdir(output_dir):
-        if file.endswith(".fastq") and "kneaddata_paired" in file:
-            output_files.append(os.path.join(output_dir, file))
-    
+    expected_r1 = os.path.join(output_dir, f"{sample_id}_kneaddata_paired_1.fastq")
+    expected_r2 = os.path.join(output_dir, f"{sample_id}_kneaddata_paired_2.fastq")
+
+    if os.path.exists(expected_r1):
+        output_files.append(expected_r1)
+    if os.path.exists(expected_r2):
+        output_files.append(expected_r2)
+
+    if paired_file and len(output_files) != 2:
+        logger.error(
+            f"KneadData did not produce expected paired outputs for sample {sample_id}: "
+            f"{expected_r1}, {expected_r2}"
+        )
+        return None
+
     logger.info(f"KneadData completed for sample {sample_id} with {len(output_files)} output files")
     return output_files
 
@@ -213,6 +232,15 @@ def run_kneaddata(input_files, output_dir, threads=1, reference_dbs=None,
     # Handle paired vs single end based on the paired parameter
     if paired and len(input_files) >= 2:
         cmd.extend(["--input1", input_files[0], "--input2", input_files[1]])
+
+        sample_id = os.path.basename(input_files[0])
+        for suffix in ["_R1.fastq.gz", "_R1.fastq", "_1.fastq.gz", "_1.fastq"]:
+            if sample_id.endswith(suffix):
+                sample_id = sample_id[:-len(suffix)]
+                break
+
+        cmd.extend(["--output-prefix", f"{sample_id}_kneaddata"])
+
         logger.info(f"Running KneadData in paired mode with files: {input_files[0]} and {input_files[1]}")
     elif len(input_files) >= 1:
         cmd.extend(["--input", input_files[0]])

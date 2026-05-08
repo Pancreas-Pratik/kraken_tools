@@ -88,56 +88,83 @@ def run_preprocessing_pipeline(
     
     logger.info(f"KneadData produced {len(kneaddata_files)} output files")
     
-    # 3. Run Kraken2
-    logger.info("Starting Kraken2 step...")
-    kraken_results = run_kraken(
-        input_files=kneaddata_files,
-        output_dir=kraken_output_dir,
-        threads=threads,
-        kraken_db=kraken_db,
-        paired=False,  # KneadData outputs are always single-end
-        additional_options=kraken_options,
-        logger=logger
-    )
+    # 3. Run Kraken2 only if a Kraken DB was provided.
+    # In full-pipeline, cli.py intentionally passes kraken_db=None here so that
+    # preprocessing runs KneadData only; Kraken2 runs later in the classification step.
+    kraken_results = None
+    if kraken_db:
+        logger.info("Starting Kraken2 step...")
+        kraken_results = run_kraken(
+            input_files=kneaddata_files,
+            output_dir=kraken_output_dir,
+            threads=threads,
+            kraken_db=kraken_db,
+            paired=paired,
+            additional_options=kraken_options,
+            logger=logger
+        )
+
+        if not kraken_results:
+            logger.error("Kraken2 step failed; stopping pipeline")
+            return {
+                'kneaddata_files': kneaddata_files
+            }
+
+        logger.info(f"Kraken2 completed for {len(kraken_results)} samples")
+    else:
+        logger.info("Skipping preprocessing-stage Kraken2; classification-stage Kraken2 will use KneadData paired outputs")
+
+
     
-    if not kraken_results:
-        logger.error("Kraken2 step failed; stopping pipeline")
-        return {
-            'kneaddata_files': kneaddata_files
+    # 4. Run Bracken only if a Bracken DB was provided and Kraken2 ran.
+    bracken_results = None
+    if bracken_db and kraken_results:
+        logger.info("Starting Bracken step...")
+
+        kreport_files = {
+            sample_id: result["report"]
+            for sample_id, result in kraken_results.items()
+            if result and "report" in result
         }
-    
-    logger.info(f"Kraken2 completed for {len(kraken_results)} samples")
-    
-    # 4. Run Bracken
-    logger.info("Starting Bracken step...")
-    kreport_files = {sample_id: results['report'] for sample_id, results in kraken_results.items()}
-    
-    bracken_results = run_bracken(
-        kreport_files=kreport_files,
-        output_dir=bracken_output_dir,
-        threads=threads,
-        bracken_db=bracken_db,
-        taxonomic_level=taxonomic_level,
-        threshold=threshold,
-        additional_options=bracken_options,
-        logger=logger
-    )
-    
-    if not bracken_results:
-        logger.error("Bracken step failed")
-        return {
-            'kneaddata_files': kneaddata_files,
-            'kraken_results': kraken_results
-        }
-    
-    logger.info(f"Bracken completed for {len(bracken_results)} samples")
-    
+
+        if not kreport_files:
+            logger.info("Skipping preprocessing-stage Bracken because no Kraken reports were produced")
+        else:
+            bracken_results = run_bracken(
+                kreport_files=kreport_files,
+                output_dir=bracken_output_dir,
+                threads=threads,
+                bracken_db=bracken_db,
+                taxonomic_level=taxonomic_level,
+                threshold=threshold,
+                additional_options=bracken_options,
+                logger=logger
+            )
+
+            if not bracken_results:
+                logger.error("Bracken step failed")
+                return {
+                    'kneaddata_files': kneaddata_files,
+                    'kraken_results': kraken_results
+                }
+
+            logger.info(f"Bracken completed for {len(bracken_results)} samples")
+    else:
+        logger.info("Skipping preprocessing-stage Bracken; classification-stage Bracken will use Kraken2 reports")
+
     # 5. Return results
-    return {
-        'kneaddata_files': kneaddata_files,
-        'kraken_results': kraken_results,
-        'bracken_results': bracken_results
+    results_out = {
+        'kneaddata_files': kneaddata_files
     }
+
+    if kraken_results:
+        results_out['kraken_results'] = kraken_results
+
+    if bracken_results:
+        results_out['bracken_results'] = bracken_results
+
+    return results_out
+
 
 @track_peak_memory
 def run_preprocessing_pipeline_parallel(
@@ -219,58 +246,76 @@ def run_preprocessing_pipeline_parallel(
         
     logger.info(f"KneadData produced {len(kneaddata_files)} output files")
     
-    # 3. Run Kraken2 in parallel
-    logger.info("Starting Kraken2 step in parallel...")
-    kraken_results = run_kraken_parallel(
-        input_files=kneaddata_files,
-        output_dir=kraken_output_dir,
-        threads=threads_per_sample,
-        max_parallel=max_parallel,
-        kraken_db=kraken_db,
-        paired=False,  # KneadData outputs are always single-end
-        additional_options=kraken_options,
-        logger=logger
-    )
+    # 3. Run Kraken2 in parallel only if a Kraken DB was provided.
+    # In full-pipeline, cli.py intentionally passes kraken_db=None here so that
+    # preprocessing runs KneadData only; Kraken2 runs later in the classification step.
+    kraken_results = None
+    if kraken_db:
+        logger.info("Starting Kraken2 step in parallel...")
+        kraken_results = run_kraken_parallel(
+            input_files=kneaddata_files,
+            output_dir=kraken_output_dir,
+            threads=threads_per_sample,
+            max_parallel=max_parallel,
+            kraken_db=kraken_db,
+            paired=paired,
+            additional_options=kraken_options,
+            logger=logger
+        )
+        if not kraken_results:
+            logger.error("Kraken2 step failed; stopping pipeline")
+            return {
+                'kneaddata_files': kneaddata_files
+            }
+
+        logger.info(f"Kraken2 completed for {len(kraken_results)} samples")
+    else:
+        logger.info("Skipping preprocessing-stage Kraken2; classification-stage Kraken2 will use KneadData paired outputs")
     
-    if not kraken_results:
-        logger.error("Kraken2 step failed; stopping pipeline")
-        return {
-            'kneaddata_files': kneaddata_files
-        }
-    
-    logger.info(f"Kraken2 completed for {len(kraken_results)} samples")
-    
-    # 4. Run Bracken in parallel
-    logger.info("Starting Bracken step in parallel...")
-    kreport_files = {}
-    for sample_id, results in kraken_results.items():
-        if 'report' in results:
-            kreport_files[sample_id] = results['report']
-    
-    bracken_results = run_bracken_parallel(
-        kreport_files=kreport_files,
-        output_dir=bracken_output_dir,
-        threads=threads_per_sample,
-        max_parallel=max_parallel,
-        bracken_db=bracken_db,
-        taxonomic_level=taxonomic_level,
-        threshold=threshold,
-        additional_options=bracken_options,
-        logger=logger
-    )
-    
-    if not bracken_results:
-        logger.error("Bracken step failed")
-        return {
-            'kneaddata_files': kneaddata_files,
-            'kraken_results': kraken_results
-        }
-    
-    logger.info(f"Bracken completed for {len(bracken_results)} samples")
-    
+    # 4. Run Bracken in parallel only if a Bracken DB was provided and Kraken2 ran.
+    bracken_results = None
+    if bracken_db and kraken_results:
+        logger.info("Starting Bracken step in parallel...")
+        kreport_files = {}
+        for sample_id, results in kraken_results.items():
+            if 'report' in results:
+                kreport_files[sample_id] = results['report']
+
+        if not kreport_files:
+            logger.info("Skipping preprocessing-stage Bracken because no Kraken reports were produced")
+        else:
+            bracken_results = run_bracken_parallel(
+                kreport_files=kreport_files,
+                output_dir=bracken_output_dir,
+                threads=threads_per_sample,
+                max_parallel=max_parallel,
+                bracken_db=bracken_db,
+                taxonomic_level=taxonomic_level,
+                threshold=threshold,
+                additional_options=bracken_options,
+                logger=logger
+            )
+
+            if not bracken_results:
+                logger.error("Bracken step failed")
+                return {
+                    'kneaddata_files': kneaddata_files,
+                    'kraken_results': kraken_results
+                }
+
+            logger.info(f"Bracken completed for {len(bracken_results)} samples")
+    else:
+        logger.info("Skipping preprocessing-stage Bracken; classification-stage Bracken will use Kraken2 reports")
+
     # 5. Return results
-    return {
-        'kneaddata_files': kneaddata_files,
-        'kraken_results': kraken_results,
-        'bracken_results': bracken_results
+    results_out = {
+        'kneaddata_files': kneaddata_files
     }
+
+    if kraken_results:
+        results_out['kraken_results'] = kraken_results
+
+    if bracken_results:
+        results_out['bracken_results'] = bracken_results
+
+    return results_out

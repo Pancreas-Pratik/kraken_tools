@@ -676,8 +676,8 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                     threads_per_sample=args.threads_per_sample,
                     max_parallel=args.max_parallel,
                     kneaddata_dbs=args.kneaddata_dbs,
-                    kraken_db=args.kraken_db,
-                    bracken_db=args.bracken_db,
+                    kraken_db=None,
+                    bracken_db=None,
                     paired=args.paired,
                     logger=logger
                 )
@@ -687,8 +687,8 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                     output_dir=preproc_dir,
                     threads=args.threads,
                     kneaddata_dbs=args.kneaddata_dbs,
-                    kraken_db=args.kraken_db,
-                    bracken_db=args.bracken_db,
+                    kraken_db=None,
+                    bracken_db=None,
                     paired=args.paired,
                     logger=logger
                 )
@@ -746,7 +746,7 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                         threads=args.threads_per_sample,
                         max_parallel=args.max_parallel,
                         kraken_db=args.kraken_db,
-                        paired=False,  # KneadData outputs are single-end
+                        paired=args.paired,
                         logger=logger
                     )
                 else:
@@ -755,7 +755,7 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                         output_dir=kreport_dir,
                         threads=args.threads,
                         kraken_db=args.kraken_db,
-                        paired=False,  # KneadData outputs are single-end
+                        paired=args.paired,
                         logger=logger
                     )
                 
@@ -974,7 +974,7 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
             
             if args.use_parallel:
                 bracken_results = run_bracken_parallel(
-                    kreport_files=kreport_files if kreport_files else None,
+                    kreport_files=kreport_files if 'kreport_files' in locals() else None,
                     output_dir=bracken_dir,
                     threads=args.threads_per_sample,
                     max_parallel=args.max_parallel,
@@ -985,7 +985,7 @@ For detailed help on a specific command, run: kraken-tools COMMAND --help
                 )
             else:
                 bracken_results = run_bracken(
-                    kreport_files=kreport_files if kreport_files else None,
+                    kreport_files=kreport_files if 'kreport_files' in locals() else None,
                     output_dir=bracken_dir,
                     threads=args.threads,
                     bracken_db=args.bracken_db,
